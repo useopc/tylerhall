@@ -1,0 +1,87 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+	<title>untitled</title>
+	<script type="text/javascript" charset="utf-8" src="http://s3.amazonaws.com/tylerhall/jquery-1.2.1.min.js"></script>
+	<script type="text/javascript" charset="utf-8">
+		var links = { 
+			delicious : "http://del.icio.us/post?url=<url>",
+			facebook : "http://www.facebook.com/sharer.php?u=<url>",
+			su : "http://www.stumbleupon.com/submit?url=<url>",
+			newsvine : "http://www.newsvine.com/_tools/seed&save?u=<url>",
+			technorati : "http://technorati.com/faves/?add=<url>",
+			ybkm : "http://bookmarks.yahoo.com/toolbar/savebm?opener=tb&u=<url>",
+			ask : "http://myjeeves.ask.com/mysearch/BookmarkIt?v=1.2&t=webpages&url=<url>",
+			slashdot : "http://slashdot.org/bookmark.pl?url=<url>",
+			simpy : "http://www.simpy.com/simpy/LinkAdd.do?href=<url>",
+			spurl : "http://www.spurl.net/spurl.php?url=<url>",
+			goog : "http://www.google.com/bookmarks/mark?op=add&bkmk=<url>",
+			digg : "http://digg.com/submit?phase=2&url=<url>",
+			furl : "http://www.furl.net/savedialog.jsp?p=1&u=<url>&t=&r=&v=1&c=",
+			myweb : "http://myweb2.search.yahoo.com/mypreview/bookmarklet?u=<url>&t=",
+			reddit : "http://reddit.com/submit?url=<url>&title=",
+			live : "https://favorites.live.com/quickadd.aspx?marklet=1&mkt=en-us&url=<url>&title=&top=1",
+			twitter : "http://twitter.com/home?status=Add+This:+<url>",
+			fark : "http://cgi.fark.com/cgi/fark/submit.pl?new_url=<url>&new_comment=",
+			magnolia : "http://ma.gnolia.com/bookmarklet/add?url=<url>&title=",
+			blinklist : "http://www.blinklist.com/index.php?Action=Blink/addblink.php&Url=<url>&Title=",
+		};
+
+		$(document).ready(function() {
+			$("#links input").click(function() { 
+				$("textarea").val("");
+				jQuery.each($("#links input"), function() {
+					if(this.checked) {
+						href = links[this.id].replace("<url>", escape($("#url").val()));
+						// text = jQuery.trim($("#" + this.id).next().text());
+						img = "<img src='" + this.id + ".png'/>";
+						$("textarea").val($("textarea").val() + "<a href='" + href + "'>" + img + "</a>\n");
+						$("#preview").html($("textarea").val());
+					} // EndIf
+				}); // End ForEach
+			});
+	 	}); // End OnReady
+	
+	</script>
+	<style type="text/css" media="screen">
+		#links p { float:left; }
+		.clear { clear:both; }
+		textarea { width:100%; height:150px; border:1px solid #000; }
+		#preview img { border:0; }
+	</style>
+</head>
+
+<body>
+	<p><label for="url">URL</label> <input type="text" name="url" value="" id="url"/></p>
+	<div id="links">
+		<p><input type="checkbox" id="delicious"/> <label for="delicious"><img src="delicious.png" /> del.icio.us</label></p>
+		<p><input type="checkbox" id="facebook"/> <label for="facebook"><img src="facebook.png" /> Facebook</label></p>
+		<p><input type="checkbox" id="su"/> <label for="su"><img src="su.png" /> StumbleUpon</label></p>
+		<p><input type="checkbox" id="newsvine"/> <label for="newsvine"><img src="newsvine.png" /> Newsvine</label></p>
+		<p><input type="checkbox" id="technorati"/> <label for="technorati"><img src="technorati.png" /> Technorati</label></p>
+		<p><input type="checkbox" id="ybkm"/> <label for="ybkm"><img src="ybkm.png" /> Yahoo! Boomarks</label></p>
+		<p><input type="checkbox" id="ask"/> <label for="ask"><img src="ask.png" /> Ask</label></p>
+		<p><input type="checkbox" id="slashdot"/> <label for="slashdot"><img src="slashdot.png" /> Slashdot</label></p>
+		<p><input type="checkbox" id="simpy"/> <label for="simpy"><img src="simpy.png" /> Simpy</label></p>
+		<p><input type="checkbox" id="spurl"/> <label for="spurl"><img src="spurl.png" /> Spurl</label></p>
+		<p><input type="checkbox" id="goog"/> <label for="goog"><img src="goog.png" /> Google Bookmarks</label></p>
+		<p><input type="checkbox" id="digg"/> <label for="digg"><img src="digg.png" /> Digg</label></p>
+		<p><input type="checkbox" id="furl"/> <label for="furl"><img src="furl.png" /> Furl</label></p>
+		<p><input type="checkbox" id="myweb"/> <label for="myweb"><img src="myweb.png" /> Yahoo! MyWeb</label></p>
+		<p><input type="checkbox" id="reddit"/> <label for="reddit"><img src="reddit.png" /> Reddit</label></p>
+		<p><input type="checkbox" id="live"/> <label for="live"><img src="live.png" /> Live</label></p>
+		<p><input type="checkbox" id="twitter"/> <label for="twitter"><img src="twitter.png" /> Twitter</label></p>
+		<p><input type="checkbox" id="fark"/> <label for="fark"><img src="fark.png" /> Fark</label></p>
+		<p><input type="checkbox" id="magnolia"/> <label for="magnolia"><img src="magnolia.png" /> ma.gnolia.com</label></p>
+		<p><input type="checkbox" id="blinklist"/> <label for="blinklist"><img src="blinklist.png" /> BlinkList</label></p>
+	</div>
+
+	<br class="clear" />
+
+	<textarea></textarea>
+	<div id="preview"></div>
+</body>
+</html>
