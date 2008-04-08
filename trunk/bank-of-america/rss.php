@@ -6,9 +6,9 @@
 	$challenges = array('<key1>' => '<answer1>', '<key2>' => '<answer2>', '<key3>' => '<answer3>');
 
 	// Grab the challenge question
-	do_curl('https://www.bankofamerica.com/mobile/iphone.do');
-	do_curl('https://sitekey.bankofamerica.com/sas/signonScreen.do?isMobileDevice=true');
-	$html = do_curl('https://sitekey.bankofamerica.com/sas/signonMobile.do', 'nextAction=screen&customer_Type=MODEL&reason=&portal=&history=&cache=&dltoken=&pmbutton=false&onlineID=' . $username . '&rembme=Y');
+	do_curl("https://www.bankofamerica.com/mobile/iphone.do");
+	do_curl("https://sitekey.bankofamerica.com/sas/signonScreen.do?isMobileDevice=true");
+	$html = do_curl("https://sitekey.bankofamerica.com/sas/signonMobile.do", "nextAction=screen&customer_Type=MODEL&reason=&portal=&history=&cache=&dltoken=&pmbutton=false&onlineID=$username&rembme=Y");
 
 	// Answer the challenge question
 	$found = false;
@@ -20,11 +20,11 @@
 			break;
 		}
 	}
-	if(!$found) die("We couldn't answer the challenge question!");
-	do_curl('https://sitekey.bankofamerica.com/sas/challengeQandAMobile.do', 'nextAction=verify&sitekeyChallengeAnswer=' . $answer . '&sitekeyDeviceBind=false');
+	if(!$found) die("We couldn't answer the challenge question.");
+	do_curl("https://sitekey.bankofamerica.com/sas/challengeQandAMobile.do", "nextAction=verify&sitekeyChallengeAnswer=$answer&sitekeyDeviceBind=false");
 
 	// Enter our password
-	$html = do_curl('https://sitekey.bankofamerica.com/sas/verifyImageMobile.do', 'nextAction=signon&passcode=' . $password);
+	$html = do_curl("https://sitekey.bankofamerica.com/sas/verifyImageMobile.do", "nextAction=signon&passcode=$password");
 
 	// Grab the cipher hex
 	$cipher = match('/<input.*?CIPHER.*?value="(.*?)"/', $html, 1);
@@ -48,24 +48,28 @@
 	$rss_desc  = match('/<h3>(.*?)</', $html, 1);
 	$balance   = trim(match('/Avail Bal:(.*)/', $html, 1));	
 
-	if(isset($_GET['type']) && ($_GET['type'] == 'pending'))
+	if(isset($_GET['type']) && ($_GET['type'] == "pending"))
 	{
-		$type  = 'Pending';
+		$type  = "Pending";
 		$trans = array();
 		$href  = match('/\/(cgi-bin.*?Pending)/', $html, 1);
 		$phtml = do_curl($domain . $href);
 		preg_match_all('/<br>(.*?)Pending.*?(-?\$[0-9]+\.[0-9][0-9])/ms', $phtml, $matches);
-			$trans[] = array('description' => trim(strip_tags($matches[1][$i])), 'amount' => $matches[2][$i], 'date' => date('Y-m-d'));
+		for($i = 0; $i < count($matches[1]); $i++)
+			$trans[] = array('description' => trim(strip_tags($matches[1][$i])), 'amount' => $matches[2][$i], 'date' => date("Y-m-d"));
 	}
 	else
 	{
-		$type  = 'Cleared';
+		$type  = "Cleared";
 		$trans = array();
 		$href  = match('/\/(cgi-bin.*?Cleared)/', $html, 1);
 		$chtml = do_curl($domain . $href);
 		preg_match_all('/txnid=[0-9]+">(.*?)<\/a>.*?([0-9][0-9]\/[0-9][0-9]\/[0-9][0-9][0-9][0-9]).*?(-?\$[0-9]+\.[0-9][0-9])/ms', $chtml, $matches);
 		for($i = 0; $i < count($matches[1]); $i++)
-			$trans[] = array('description' => trim(strip_tags($matches[1][$i])), 'date' => $matches[2][$i], 'amount' => $matches[3][$i]);
+		{
+			$date = match('/([01][0-9]\/[0-3][0-9])/', trim(strip_tags($matches[2][$i])), 1) . '/' . date('Y');
+			$trans[] = array('description' => trim(strip_tags($matches[1][$i])), 'amount' => $matches[3][$i], 'date' => date('Y-m-d', strtotime($date)));
+		}
 	}
 
 	// And build the RSS feed
@@ -81,18 +85,23 @@
 
 	foreach($trans as $t)
 	{
+		$title = str_replace("&nbsp;", "", $t['description']);
+		$title = str_replace("&amp;#39;", "'", $title);
+		$title = preg_replace("/     [ ]+/", "", $title);
+		$title = preg_replace("/[0-9]{5}[0-9]*/", "", $title);
+
 		$out .= "<item>\n";
-		$out .= '<title>' . $t['description'] . '(' . $t['amount'] . ")</title>\n";
+		$out .= "<title>$title (" . $t['amount'] . ")</title>\n";
 		$out .= "<link>https://www.bankofamerica.com</link>\n";
 		$out .= "<description><![CDATA[ " . str_replace("&nbsp;", "", $t['description']) . "<br/>" . $t['amount'] . " ]]></description>\n";
 		$out .= "<pubDate>" . date("D, d M Y H:i:s O", strtotime($t['date'] . " 12:00pm")) . "</pubDate>\n";
 		$out .= "</item>\n";
 	}
 
-	$out .= '</rss>';
+	$out .= "</rss>";
 
 	// Output the results
-	header('Content-type: application/xml');
+	header("Content-type: application/xml");
 	echo $out;
 
 	function do_curl($url, $post = null)
