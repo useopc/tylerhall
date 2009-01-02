@@ -55,6 +55,7 @@
 			$arr['plot'] = trim(strip_tags($this->match('/Plot:(.*?)<a/ms', $html, 1)));
 			$arr['genres'] = $this->match_all('/Sections\/Genres\/(.*?)[\/">]/ms', $html, 1);
 			$arr['genres'] = array_unique($arr['genres']);
+			$arr['poster'] = $this->match('/(http:\/\/ia.media-imdb.com\/images.*?)" \/><\/a>/ms', $html, 1);
 
 			$arr['cast'] = array();
 			foreach($this->match_all('/class="nm">(.*?\.\.\..*?)<\/tr>/ms', $html, 1) as $m)
