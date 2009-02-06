@@ -41,7 +41,7 @@
         public function __construct()
         {
             $this->flags = array();
-            $this->args    = array();
+            $this->args  = array();
 
             $argv = $GLOBALS['argv'];
             array_shift($argv);
@@ -53,18 +53,18 @@
                 // --foo
                 if(strlen($str) > 2 && substr($str, 0, 2) == '--')
                 {
-                    $this->flags[substr($str, 2)] = true;
-
+					$str = substr($str, 2);
                     $parts = explode('=', $str);
+                    $this->flags[$parts[0]] = true;
 
                     // Does not have an =, so choose the next arg as its value
                     if(count($parts) == 1 && isset($argv[$i + 1]) && preg_match('/^--?.+/', $argv[$i + 1]) == 0)
                     {
-                        $this->flags[substr($str, 2)] = $argv[$i + 1];
+                        $this->flags[$parts[0]] = $argv[$i + 1];
                     }
                     elseif(count($parts) == 2) // Has a =, so pick the second piece
                     {
-                        $this->flags[substr($str, 2)] = $parts[1];
+                        $this->flags[$parts[0]] = $parts[1];
                     }
                 }
                 elseif(strlen($str) == 2 && $str[0] == '-') // -a
