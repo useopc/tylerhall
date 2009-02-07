@@ -72,8 +72,7 @@
 
 	
 	$qt = new QTMovie();
-	$qt->addRef("http://snipplr.com/images/bookmarklet.mov", 6400, 500);
-	$qt->addRef("http://snipplr.com/images/wordpress.mov", 100000, 500);
+	$qt->addRef("http://audio-mp3.ibiblio.org:8000/wcpe.mp3", 6400, 500);
 
 	header("Content-type: video/quicktime");
 	echo $qt;
