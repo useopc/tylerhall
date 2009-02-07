@@ -2,56 +2,82 @@
 <?PHP
     $args = new Args();
 
-    if(count($args->args) != 3)
-    {
-        echo "Usage: s3up [-z] bucket s3path filename\n\n";
-        echo "s3up stores files in Amazon S3 for use as a content delivery network. All\n";
-        echo "files are given a far-future expires header. A gzipped version of the file can\n";
-        echo "also be uploaded using the -z flag.\n";
-        exit;
-    }
+	// Help info...
+	if(count($args->args) != 2 && count($args->args) != 3)
+	{
+		echo "Usage: {$GLOBALS['argv'][0]} [-txz] [options] s3-bucket s3-filename filename\n";
+		echo "  -t        Append timestamp to uploaded filename for versioning.\n";
+		echo "  -x        Set far future expiry headers on uploaded file.\n";
+		echo "  -z        Upload a gzipped version in addition to the main file.\n";
+		echo "\n";
+		echo "  --key     Amazon S3 key\n";
+		echo "  --secret  Amazon S3 private key\n";
+		echo "\n";
+		echo "            If --key and --secret are not specified,\n";
+		echo "            s3up will read values from the AMZ_KEY\n";
+		echo "            and AMZ_SECRET environment variables.\n\n";
+		exit;
+	}
 
-    if(upload_static_file($args->args[0], $args->args[1], $args->args[2]))
-        echo "Ok\n";
+	// Get our Amazon credentials...
+	$AMZ_KEY = $args->flag('key') ? $args->flag('key') : @$_ENV['AMZ_KEY'];
+	$AMZ_SECRET = $args->flag('secret') ? $args->flag('secret') : @$_ENV['AMZ_SECRET'];
+	if(strlen($AMZ_KEY) == 0 || strlen($AMZ_SECRET) == 0)
+		die("Amazon key and private key must both be defined.\n");
 
-    function upload_static_file($s3_bucket, $s3_filename, $filename)
-    {
-        if(!file_exists($filename) || !is_readable($filename))
-        {
-            echo "Could not read file '$filename'\n";
-            return false;
-        }
+	// Accept file to upload via stdin...
+    if(count($args->args) == 2)
+	{
+		$filename = tempnam('/tmp', 's3up');
+		$src = fopen('php://stdin', 'r');
+		$dest = fopen($filename, 'w');
+		stream_copy_to_stream($src, $dest);
+	}
+	else // Upload an existing file...
+	{
+		$filename = $args->args[2];
+		if(!file_exists($filename) || !is_readable($filename))
+			die("Cannot read $filename\n");
+	}
 
-        $s3 = new S3($_ENV['AWS_KEY'], $_ENV['AWS_SECRET']);
+	// Gather our arguments...
+	$s3_bucket = $args->args[0];
+	$s3_filename = $args->args[1];
 
-        // Set a far future time for the expires header
-        $expires = date('D, j M Y 23:59:59', time() + (86400 * 365 * 10)) . ' GMT';
+	// Prepare any additional headers...
+	$headers = array();
+	if($args->flag('x'))
+		$headers['Expires'] = date('D, j M Y H:i:s', time() + (86400 * 365 * 10)) . ' GMT'; // 10 years
+		
+	// Version the file?
+	if($args->flag('t'))
+	{
+		$info = pathinfo($s3_filename);
+		$s3_filename = $info['filename'] . '.' . date('YmdHis') . '.' . $info['extension'];
+	}
 
-        if(!$s3->uploadFile($s3_bucket, $s3_filename, $filename, true, array('Expires' => $expires)))
-        {
-            echo "Could not upload '$filename' to '$s3_filename'\n";
-            return false;
-        }
+	// Actually upload the file...
+	$s3 = new S3($AMZ_KEY, $AMZ_SECRET);
+	if($s3->uploadFile($s3_bucket, $s3_filename, $filename, true, $headers))
+		echo "http://$s3_bucket.s3.amazonaws.com/$s3_filename\n";
+	else
+		die("Unable to upload '$filename' to '$s3_filename'\n");
 
-        $info     = pathinfo($filename);
-        $ext      = $info['extension'];
+	// Upload the gzipped version...
+	if($args->flag('z'))
+	{
+		$gzname = tempnam('/tmp', 's3up');
+		shell_exec(sprintf('gzip -c %s > %s', escapeshellarg($filename), $gzname));
 
-        if($GLOBALS['args']->flag('z'))
-        {
-            $tmpfn = tempnam('/tmp', 's3up') . '.' . $ext;
-            shell_exec(sprintf('gzip -c %s > %s', escapeshellarg($filename), $tmpfn));
+		$info = pathinfo($s3_filename);
+		$s3_filename = $info['filename'] . '.gz.' . $info['extension'];
 
-            $s3_filename = preg_replace('/\.(.{1,4})$/', '.gz.$1', $s3_filename);
-
-            if(!$s3->uploadFile($s3_bucket, $s3_filename, $tmpfn, true, array('Expires' => $expires, 'Content-Encoding' => 'gzip')))
-            {
-                echo "Could not upload $filename to $s3_filename\n";
-                return false;
-            }
-        }
-
-        return true;
-    }
+		$headers['Content-Encoding'] = 'gzip';
+		if($s3->uploadFile($s3_bucket, $s3_filename, $gzname, true, $headers))
+			echo "http://$s3_bucket.s3.amazonaws.com/$s3_filename\n";
+		else
+			die("Unable to upload '$filename' to '$s3_filename' (gzip version)\n");
+	}
 
     // ################################################################
     // ################################################################
@@ -389,7 +415,7 @@
         public function __construct()
         {
             $this->flags = array();
-            $this->args    = array();
+            $this->args  = array();
 
             $argv = $GLOBALS['argv'];
             array_shift($argv);
@@ -401,18 +427,18 @@
                 // --foo
                 if(strlen($str) > 2 && substr($str, 0, 2) == '--')
                 {
-                    $this->flags[substr($str, 2)] = true;
-
+					$str = substr($str, 2);
                     $parts = explode('=', $str);
+                    $this->flags[$parts[0]] = true;
 
                     // Does not have an =, so choose the next arg as its value
                     if(count($parts) == 1 && isset($argv[$i + 1]) && preg_match('/^--?.+/', $argv[$i + 1]) == 0)
                     {
-                        $this->flags[substr($str, 2)] = $argv[$i + 1];
+                        $this->flags[$parts[0]] = $argv[$i + 1];
                     }
                     elseif(count($parts) == 2) // Has a =, so pick the second piece
                     {
-                        $this->flags[substr($str, 2)] = $parts[1];
+                        $this->flags[$parts[0]] = $parts[1];
                     }
                 }
                 elseif(strlen($str) == 2 && $str[0] == '-') // -a
