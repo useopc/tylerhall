@@ -53,7 +53,8 @@
 	if($args->flag('t'))
 	{
 		$info = pathinfo($s3_filename);
-		$s3_filename = $info['filename'] . '.' . date('YmdHis') . '.' . $info['extension'];
+		$dir = $info['dirname'] . '/';
+		$s3_filename = $dir . $info['filename'] . '.' . date('YmdHis') . '.' . $info['extension'];
 	}
 
 	// Actually upload the file...
@@ -66,11 +67,12 @@
 	// Upload the gzipped version...
 	if($args->flag('z'))
 	{
-		$gzname = tempnam('/tmp', 's3up');
-		shell_exec(sprintf('gzip -c %s > %s', escapeshellarg($filename), $gzname));
-
 		$info = pathinfo($s3_filename);
-		$s3_filename = $info['filename'] . '.gz.' . $info['extension'];
+		$dir = $info['dirname'] . '/';
+		$s3_filename = $dir . $info['filename'] . '.gz.' . $info['extension'];
+
+		$gzname = tempnam('/tmp', 's3up') . '.' . $info['extension'];
+		shell_exec(sprintf('gzip -c %s > %s', escapeshellarg($filename), $gzname));
 
 		$headers['Content-Encoding'] = 'gzip';
 		if($s3->uploadFile($s3_bucket, $s3_filename, $gzname, true, $headers))
