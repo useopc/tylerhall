@@ -47,7 +47,9 @@
 		{
 			if(!file_exists($args->args[$i]) || !is_readable($args->args[$i]))
 				die("Cannot read $filename\n");
-			upload_static_file($s3_bucket, $s3_dir . $args->args[$i], $args->args[$i], $args);
+
+			$info = pathinfo($args->args[$i]);
+			upload_static_file($s3_bucket, $s3_dir . $info['basename'], $args->args[$i], $args);
 		}
 	}
 	else // Upload a single file...
@@ -62,7 +64,7 @@
 	function upload_static_file($bucket, $remote_name, $local_name, $args)
 	{
 		global $AMZ_KEY, $AMZ_SECRET;
-
+		
 		// Prepare any additional headers...
 		$headers = array();
 		if($args->flag('x'))
