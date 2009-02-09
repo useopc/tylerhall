@@ -3,12 +3,14 @@
     $args = new Args();
 
 	// Help info...
-	if(count($args->args) != 2 && count($args->args) != 3)
+	if(count($args->args) < 2)
 	{
 		echo "Usage: {$GLOBALS['argv'][0]} [-txz] [options] s3-bucket s3-filename filename\n";
 		echo "  -t        Append timestamp to uploaded filename for versioning.\n";
 		echo "  -x        Set far future expiry headers on uploaded file.\n";
 		echo "  -z        Upload a gzipped version in addition to the main file.\n";
+		echo "\n";
+		echo "  --version Appends a timestamp (string) of your choosing to each file.\n";
 		echo "\n";
 		echo "  --key     Amazon S3 key\n";
 		echo "  --secret  Amazon S3 private key\n";
@@ -25,6 +27,10 @@
 	if(strlen($AMZ_KEY) == 0 || strlen($AMZ_SECRET) == 0)
 		die("Amazon key and private key must both be defined.\n");
 
+	// Gather our arguments...
+	$s3_bucket = $args->args[0];
+	$s3_filename = $args->args[1];
+
 	// Accept file to upload via stdin...
     if(count($args->args) == 2)
 	{
@@ -32,53 +38,73 @@
 		$src = fopen('php://stdin', 'r');
 		$dest = fopen($filename, 'w');
 		stream_copy_to_stream($src, $dest);
+		upload_static_file($s3_bucket, $s3_filename, $filename, $args);
 	}
-	else // Upload an existing file...
+	elseif(substr($s3_filename, -1, 1) == '/') // Assume $s3_filename is actuall a directory, so upload files "into" it instead
+	{
+		$s3_dir = $s3_filename;
+		for($i = 2; $i < count($args->args); $i++)
+		{
+			if(!file_exists($args->args[$i]) || !is_readable($args->args[$i]))
+				die("Cannot read $filename\n");
+			upload_static_file($s3_bucket, $s3_dir . $args->args[$i], $args->args[$i], $args);
+		}
+	}
+	else // Upload a single file...
 	{
 		$filename = $args->args[2];
 		if(!file_exists($filename) || !is_readable($filename))
 			die("Cannot read $filename\n");
+		upload_static_file($s3_bucket, $s3_filename, $filename, $args);
 	}
 
-	// Gather our arguments...
-	$s3_bucket = $args->args[0];
-	$s3_filename = $args->args[1];
-
-	// Prepare any additional headers...
-	$headers = array();
-	if($args->flag('x'))
-		$headers['Expires'] = date('D, j M Y H:i:s', time() + (86400 * 365 * 10)) . ' GMT'; // 10 years
-		
-	// Version the file?
-	if($args->flag('t'))
+	
+	function upload_static_file($bucket, $remote_name, $local_name, $args)
 	{
-		$info = pathinfo($s3_filename);
-		$dir = $info['dirname'] . '/';
-		$s3_filename = $dir . $info['filename'] . '.' . date('YmdHis') . '.' . $info['extension'];
-	}
+		global $AMZ_KEY, $AMZ_SECRET;
 
-	// Actually upload the file...
-	$s3 = new S3($AMZ_KEY, $AMZ_SECRET);
-	if($s3->uploadFile($s3_bucket, $s3_filename, $filename, true, $headers))
-		echo "http://$s3_bucket.s3.amazonaws.com/$s3_filename\n";
-	else
-		die("Unable to upload '$filename' to '$s3_filename'\n");
+		// Prepare any additional headers...
+		$headers = array();
+		if($args->flag('x'))
+			$headers['Expires'] = date('D, j M Y H:i:s', time() + (86400 * 365 * 10)) . ' GMT'; // 10 years
 
-	// Upload the gzipped version...
-	if($args->flag('z'))
-	{
-		$info = pathinfo($s3_filename);
-		$dir = $info['dirname'] . '/';
-		$s3_filename = $dir . $info['filename'] . '.gz.' . $info['extension'];
+		// Version the file?
+		if($args->flag('version'))
+		{
+			$info = pathinfo($remote_name);
+			$dir = $info['dirname'] . '/';
+			$remote_name = $dir . $info['filename'] . $args->flag('version') . '.' . $info['extension'];
+		}
+		elseif($args->flag('t'))
+		{
+			$info = pathinfo($remote_name);
+			$dir = $info['dirname'] . '/';
+			$remote_name = $dir . $info['filename'] . '.' . date('YmdHis') . '.' . $info['extension'];
+		}
 
-		$gzname = tempnam('/tmp', 's3up') . '.' . $info['extension'];
-		shell_exec(sprintf('gzip -c %s > %s', escapeshellarg($filename), $gzname));
-
-		$headers['Content-Encoding'] = 'gzip';
-		if($s3->uploadFile($s3_bucket, $s3_filename, $gzname, true, $headers))
-			echo "http://$s3_bucket.s3.amazonaws.com/$s3_filename\n";
+		// Actually upload the file...
+		$s3 = new S3($AMZ_KEY, $AMZ_SECRET);
+		if($s3->uploadFile($bucket, $remote_name, $local_name, true, $headers))
+			echo "http://$bucket.s3.amazonaws.com/$remote_name\n";
 		else
-			die("Unable to upload '$filename' to '$s3_filename' (gzip version)\n");
+			die("Unable to upload '$local_name' to '$remote_name'\n");
+
+		// Upload the gzipped version...
+		if($args->flag('z'))
+		{
+			$info = pathinfo($remote_name);
+			$dir = $info['dirname'] . '/';
+			$remote_name = $dir . $info['filename'] . '.gz.' . $info['extension'];
+
+			$gzname = tempnam('/tmp', 's3up') . '.' . $info['extension'];
+			shell_exec(sprintf('gzip -c %s > %s', escapeshellarg($local_name), $gzname));
+
+			$headers['Content-Encoding'] = 'gzip';
+			if($s3->uploadFile($bucket, $remote_name, $gzname, true, $headers))
+				echo "http://$bucket.s3.amazonaws.com/$remote_name\n";
+			else
+				die("Unable to upload '$local_name' to '$remote_name' (gzip version)\n");
+		}		
 	}
 
     // ################################################################
@@ -184,6 +210,8 @@
             // Content-Encoding
             // x-amz-meta-*
             // x-amz-acl (private, public-read, public-read-write, authenticated-read)
+
+			$s3_path = str_replace(' ', '%20', $s3_path);
 
             $request = array('verb' => 'PUT',
                              'resource' => "/$bucket_name/$s3_path",
@@ -411,7 +439,7 @@
 
     class Args
     {
-        private $flags;
+        public $flags;
         public $args;
 
         public function __construct()
