@@ -42,9 +42,6 @@
         echo "### " . $set['title'] . "\n";
         @mkdir("photos/{$set['title']}", 0777, true);
 
-        // Uncomment to skip existing sets...
-        // if(file_exists("photos/{$set['title']}")) continue;
-
         // Get all the photos in this set
         $photos = $f->photosets_getPhotos($set['id']);
 
@@ -62,7 +59,11 @@
             if(!is_null($url))
             {
                 $dir = escapeshellarg("photos/{$set['title']}");
-                shell_exec("cd $dir; /usr/bin/curl -O $url");
+				$filename = parse_url($url, PHP_URL_PATH);
+				
+				// Only download if file does not exist...
+				if(!file_exists("photos/{$set['title']}/$filename"))
+	                shell_exec("cd $dir; /usr/bin/curl -O $url");
             }
 
             // This helps stop the Flickr API from getting angry
